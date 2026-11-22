@@ -1,20 +1,143 @@
 package com.dhbw.tracker.service;
-import com.dhbw.tracker.dto.ApplicationDtos.*; import com.dhbw.tracker.model.*; import com.dhbw.tracker.repository.*; import com.dhbw.tracker.exception.ResourceNotFoundException; import org.springframework.data.domain.*; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import java.util.*;
-@Service public class ApplicationService {
- private final ApplicationRepository apps;private final UserRepository users;private final StatusHistoryRepository history;
- public ApplicationService(ApplicationRepository a,UserRepository u,StatusHistoryRepository h){apps=a;users=u;history=h;}
- private User owner(String email){return users.findByEmail(email).orElseThrow(()->new ResourceNotFoundException("User account not found"));}
- private ApplicationResponse dto(Application a){return new ApplicationResponse(a.getId(),a.getCompanyName(),a.getPositionTitle(),a.getStatus(),a.getApplicationDate(),a.getNotes(),a.getCreatedAt(),a.getUpdatedAt(),a.getVersion());}
- @Transactional(readOnly=true) public PageResponse<ApplicationResponse> list(String email,ApplicationStatus status,String q,int page,int size){User u=owner(email);Pageable p=PageRequest.of(page,size,Sort.by(Sort.Direction.DESC,"applicationDate").and(Sort.by("id")));Page<Application> result;
-  if(status!=null) result=apps.findAllByUserIdAndStatus(u.getId(),status,p);
-  else if(q!=null&&!q.isBlank()){String term=q.trim();result=apps.findAllByUserIdAndCompanyNameContainingIgnoreCaseOrUserIdAndPositionTitleContainingIgnoreCase(u.getId(),term,u.getId(),term,p);}
-  else result=apps.findAllByUserId(u.getId(),p);
-  return new PageResponse<>(result.getContent().stream().map(this::dto).toList(),page,size,result.getTotalElements(),result.getTotalPages(),result.isFirst(),result.isLast());
- }
- @Transactional public ApplicationResponse create(String email,ApplicationRequest r){User u=owner(email);Application a=new Application();a.setUser(u);apply(a,r);Application saved=apps.save(a);history.save(new StatusHistory(saved,null,saved.getStatus(),u));return dto(saved);}
- @Transactional public ApplicationResponse update(String email,Long id,ApplicationRequest r){User u=owner(email);Application a=apps.findByIdAndUserId(id,u.getId()).orElseThrow(()->new ResourceNotFoundException("Application not found"));ApplicationStatus old=a.getStatus();apply(a,r);if(old!=a.getStatus())history.save(new StatusHistory(a,old,a.getStatus(),u));return dto(a);}
- private void apply(Application a,ApplicationRequest r){a.setCompanyName(r.companyName().trim());a.setPositionTitle(r.positionTitle().trim());a.setStatus(r.status());a.setApplicationDate(r.applicationDate());a.setNotes(r.notes()==null?null:r.notes().trim());}
- @Transactional public void delete(String email,Long id){User u=owner(email);Application a=apps.findByIdAndUserId(id,u.getId()).orElseThrow(()->new ResourceNotFoundException("Application not found"));apps.delete(a);}
- @Transactional(readOnly=true) public StatsResponse stats(String email){User u=owner(email);return new StatsResponse(apps.countByUserId(u.getId()),apps.countByUserIdAndStatus(u.getId(),ApplicationStatus.APPLIED),apps.countByUserIdAndStatus(u.getId(),ApplicationStatus.INTERVIEWING),apps.countByUserIdAndStatus(u.getId(),ApplicationStatus.REJECTED),apps.countByUserIdAndStatus(u.getId(),ApplicationStatus.OFFERED));}
- @Transactional(readOnly=true) public List<HistoryResponse> history(String email,Long id){User u=owner(email);apps.findByIdAndUserId(id,u.getId()).orElseThrow(()->new ResourceNotFoundException("Application not found"));return history.findAllByApplicationIdOrderByChangedAtDesc(id).stream().map(h->new HistoryResponse(h.getId(),h.getOldStatus(),h.getNewStatus(),h.getChangedAt())).toList();}
+
+import com.dhbw.tracker.dto.ApplicationDtos.*;
+import com.dhbw.tracker.exception.ResourceNotFoundException;
+import com.dhbw.tracker.model.*;
+import com.dhbw.tracker.repository.*;
+import org.springframework.data.domain.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+public class ApplicationService {
+
+    private final ApplicationRepository apps;
+    private final UserRepository users;
+    private final StatusHistoryRepository history;
+
+    public ApplicationService(ApplicationRepository apps, UserRepository users, StatusHistoryRepository history) {
+        this.apps = apps;
+        this.users = users;
+        this.history = history;
+    }
+
+    private User owner(String email) {
+        return users.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User account not found"));
+    }
+
+    private ApplicationResponse dto(Application application) {
+        return new ApplicationResponse(
+                application.getId(),
+                application.getCompanyName(),
+                application.getPositionTitle(),
+                application.getStatus(),
+                application.getApplicationDate(),
+                application.getNotes(),
+                application.getCreatedAt(),
+                application.getUpdatedAt(),
+                application.getVersion()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ApplicationResponse> list(
+            String email, ApplicationStatus status, String q, int page, int size
+    ) {
+        User user = owner(email);
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "applicationDate").and(Sort.by("id"))
+        );
+
+        // Always bind a non-null String. PostgreSQL can otherwise infer a null
+        // optional search parameter as bytea when the query checks ":term is null".
+        String term = (q == null || q.isBlank()) ? "" : q.trim();
+
+        Page<Application> result = apps.searchForUser(user.getId(), status, term, pageable);
+
+        return new PageResponse<>(
+                result.getContent().stream().map(this::dto).toList(),
+                page,
+                size,
+                result.getTotalElements(),
+                result.getTotalPages(),
+                result.isFirst(),
+                result.isLast()
+        );
+    }
+
+    @Transactional
+    public ApplicationResponse create(String email, ApplicationRequest request) {
+        User user = owner(email);
+        Application application = new Application();
+        application.setUser(user);
+        apply(application, request);
+        Application saved = apps.save(application);
+        history.save(new StatusHistory(saved, null, saved.getStatus(), user));
+        return dto(saved);
+    }
+
+    @Transactional
+    public ApplicationResponse update(String email, Long id, ApplicationRequest request) {
+        User user = owner(email);
+        Application application = apps.findByIdAndUserId(id, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+
+        ApplicationStatus oldStatus = application.getStatus();
+        apply(application, request);
+
+        if (oldStatus != application.getStatus()) {
+            history.save(new StatusHistory(application, oldStatus, application.getStatus(), user));
+        }
+
+        return dto(application);
+    }
+
+    private void apply(Application application, ApplicationRequest request) {
+        application.setCompanyName(request.companyName().trim());
+        application.setPositionTitle(request.positionTitle().trim());
+        application.setStatus(request.status());
+        application.setApplicationDate(request.applicationDate());
+        application.setNotes(request.notes() == null ? null : request.notes().trim());
+    }
+
+    @Transactional
+    public void delete(String email, Long id) {
+        User user = owner(email);
+        Application application = apps.findByIdAndUserId(id, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+        apps.delete(application);
+    }
+
+    @Transactional(readOnly = true)
+    public StatsResponse stats(String email) {
+        User user = owner(email);
+        return new StatsResponse(
+                apps.countByUserId(user.getId()),
+                apps.countByUserIdAndStatus(user.getId(), ApplicationStatus.APPLIED),
+                apps.countByUserIdAndStatus(user.getId(), ApplicationStatus.INTERVIEWING),
+                apps.countByUserIdAndStatus(user.getId(), ApplicationStatus.REJECTED),
+                apps.countByUserIdAndStatus(user.getId(), ApplicationStatus.OFFERED)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistoryResponse> history(String email, Long id) {
+        User user = owner(email);
+        apps.findByIdAndUserId(id, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+
+        return history.findAllByApplicationIdOrderByChangedAtDesc(id).stream()
+                .map(entry -> new HistoryResponse(
+                        entry.getId(),
+                        entry.getOldStatus(),
+                        entry.getNewStatus(),
+                        entry.getChangedAt()
+                ))
+                .toList();
+    }
 }
