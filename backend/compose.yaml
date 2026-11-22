@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dualtrack
+      POSTGRES_USER: dualtrack
+      POSTGRES_PASSWORD: dualtrack
+    ports: ["5432:5432"]
+    volumes: ["dualtrack_pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dualtrack -d dualtrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  app:
+    build: .
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/dualtrack
+      DATABASE_USERNAME: dualtrack
+      DATABASE_PASSWORD: dualtrack
+      COOKIE_SECURE: "false"
+    ports: ["8080:8080"]
+    depends_on:
+      db: {condition: service_healthy}
+volumes:
+  dualtrack_pgdata:
