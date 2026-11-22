@@ -34,7 +34,8 @@ async function request(path, options = {}) {
   catch { data = raw; }
 
   if (!response.ok) {
-    const message = data?.message || data?.error || `Request failed (${response.status})`;
+    const fieldMessages = data?.fields ? Object.entries(data.fields).map(([field, message]) => `${field}: ${message}`).join('; ') : '';
+    const message = data?.message || fieldMessages || data?.error || `Request failed (${response.status})`;
     throw new Error(message);
   }
   return data;
