@@ -647,6 +647,13 @@
   </div>
 </div>
 
+<div id="history-modal" class="hidden" style="position:fixed;inset:0;z-index:110;background:rgba(2,8,23,.8);align-items:center;justify-content:center;padding:20px;">
+  <div class="modal-box" style="max-width:520px;max-height:80vh;overflow:auto;">
+    <div id="history-content"></div>
+    <div class="modal-actions"><button id="history-close" class="btn-cancel" type="button">Close</button></div>
+  </div>
+</div>
+
 <!-- Header -->
 <header class="site-header glass">
   <div class="header-inner">
@@ -700,6 +707,12 @@
       <p class="stat-sub">Offers Received</p>
     </div>
 
+    <div class="stat-card glass">
+      <p class="stat-label" style="color:rgba(251,113,133,0.7);">Rejected</p>
+      <p class="stat-value" id="stat-rejected" style="color:#fda4af;">—</p>
+      <p class="stat-sub">Closed Applications</p>
+    </div>
+
   </section>
 
   <!-- Content: form + table -->
@@ -715,7 +728,7 @@
               <path d="M5 12h14"/><path d="M12 5v14"/>
             </svg>
           </div>
-          <h2>New Application</h2>
+          <h2 id="form-heading">New Application</h2>
         </div>
 
         <form id="application-form" novalidate>
@@ -760,12 +773,13 @@
             <span id="submit-text">Add Application</span>
             <span id="submit-spinner" class="spinner"></span>
           </button>
+          <button type="button" id="cancel-edit" class="btn-cancel hidden" style="width:100%;margin-top:8px;">Cancel edit</button>
 
         </form>
 
         <div class="backend-hint">
           <span class="hint-comment">// backend</span><br/>
-          <span class="hint-host">railway.app</span><span style="color:#475569;"> → </span><span class="hint-path">/api/applications</span>
+          <span class="hint-host">Spring Boot</span><span style="color:#475569;"> → </span><span class="hint-path">/api/applications</span>
         </div>
 
       </div>
@@ -813,7 +827,7 @@
                 <th>Status</th>
                 <th>Date</th>
                 <th>Notes</th>
-                <th style="text-align:center;">Del</th>
+                <th style="text-align:center;">Actions</th>
               </tr>
             </thead>
             <tbody id="applications-table-body"></tbody>
@@ -840,7 +854,7 @@
 
 <footer>
   <span>DualTrack v2.0 — Dual Study Application Tracker</span>
-  <span style="color:#334155;">github.com/nestorNiloy/dual-study-application-tracker</span>
+  <span style="color:#334155;">github.com/nestorNiloy/dualtrack-enterprise</span>
 </footer>
 
 <!-- Modular JS — load in dependency order -->
