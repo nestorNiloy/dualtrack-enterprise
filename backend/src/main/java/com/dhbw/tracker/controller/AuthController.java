@@ -1,0 +1,10 @@
+package com.dhbw.tracker.controller;
+import com.dhbw.tracker.dto.AuthDtos.*;import com.dhbw.tracker.model.User;import com.dhbw.tracker.repository.UserRepository;import com.dhbw.tracker.service.AuthService;import jakarta.servlet.http.*;import jakarta.validation.Valid;import org.springframework.http.*;import org.springframework.security.core.Authentication;import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;import org.springframework.security.core.context.SecurityContextHolder;import org.springframework.security.web.context.HttpSessionSecurityContextRepository;import org.springframework.web.bind.annotation.*;import org.springframework.security.web.csrf.CsrfToken;
+@RestController @RequestMapping("/api/auth") public class AuthController {
+ private final AuthService service;private final UserRepository users;
+ public AuthController(AuthService s,UserRepository u){service=s;users=u;}
+ @GetMapping("/csrf") public java.util.Map<String,String> csrf(CsrfToken token){return java.util.Map.of("token",token.getToken());}
+ @PostMapping("/register") public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest r){User u=service.register(r);return ResponseEntity.status(201).body(new UserResponse(u.getId(),u.getEmail()));}
+ @PostMapping("/login") public ResponseEntity<UserResponse> login(@Valid @RequestBody LoginRequest r,HttpServletRequest req){service.authenticate(r);User u=users.findByEmail(r.email().trim().toLowerCase()).orElseThrow();Authentication a=new UsernamePasswordAuthenticationToken(u.getEmail(),null,java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER")));SecurityContextHolder.getContext().setAuthentication(a);req.getSession(true).setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,SecurityContextHolder.getContext());return ResponseEntity.ok(new UserResponse(u.getId(),u.getEmail()));}
+ @GetMapping("/me") public UserResponse me(Authentication a){User u=users.findByEmail(a.getName()).orElseThrow();return new UserResponse(u.getId(),u.getEmail());}
+}
