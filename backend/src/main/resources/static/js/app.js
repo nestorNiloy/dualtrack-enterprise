@@ -228,13 +228,13 @@ document.addEventListener('DOMContentLoaded', () => {
           content.appendChild(item);
         });
       }
-      dialog.classList.remove('hidden'); dialog.classList.add('flex');
+      dialog.classList.remove('hidden'); dialog.style.display = 'flex';
     } catch (error) { showToast(error.message, 'error'); }
   }
 
   byId('history-close').addEventListener('click', () => {
     byId('history-modal').classList.add('hidden');
-    byId('history-modal').classList.remove('flex');
+    byId('history-modal').style.display = 'none';
   });
 
   byId('modal-cancel').addEventListener('click', closeDeleteModal);
