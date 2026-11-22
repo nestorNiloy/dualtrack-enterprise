@@ -1,6 +1,7 @@
 package com.dhbw.tracker.integration;
 
 import com.dhbw.tracker.dto.ApplicationDtos.ApplicationRequest;
+import com.dhbw.tracker.exception.ResourceNotFoundException;
 import com.dhbw.tracker.model.*;
 import com.dhbw.tracker.repository.*;
 import com.dhbw.tracker.service.ApplicationService;
