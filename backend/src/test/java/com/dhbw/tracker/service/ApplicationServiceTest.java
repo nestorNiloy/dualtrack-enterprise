@@ -29,7 +29,7 @@ class ApplicationServiceTest {
     @BeforeEach
     void setUp() {
         owner = mock(User.class);
-        when(owner.getId()).thenReturn(42L);
+        lenient().when(owner.getId()).thenReturn(42L);
         when(users.findByEmail("owner@example.com")).thenReturn(Optional.of(owner));
     }
 
