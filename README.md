@@ -6,6 +6,10 @@ DualTrack Enterprise is a full-stack application for managing job applications t
 
 The project is structured as a **layered Spring Boot application within a modular monolith**. It uses PostgreSQL for persistent storage, Flyway for database migrations, Spring Security for authentication and authorization, and Docker for reproducible local environments.
 
+**Live demo:** https://dualtrack-enterprise.onrender.com
+
+The frontend and REST API are served by the same Spring Boot application. The current deployment runs on Render and uses a managed PostgreSQL database.
+
 ---
 
 ## Table of Contents
@@ -24,7 +28,7 @@ The project is structured as a **layered Spring Boot application within a modula
 - [Docker and Local Development](#docker-and-local-development)
 - [Project Structure](#project-structure)
 - [Configuration](#configuration)
-- [Deployment Roadmap](#deployment-roadmap)
+- [Deployment and Hosting](#deployment-and-hosting)
 - [Engineering Decisions](#engineering-decisions)
 
 ---
@@ -634,7 +638,7 @@ The workflow currently performs:
 7. Production Docker image build.
 8. JaCoCo report upload as a GitHub Actions artifact.
 
-The Docker image is currently built with `push: false`. This verifies that the image can be built but does not publish it to a container registry.
+On pushes to `main`, the workflow authenticates to GitHub Container Registry and publishes the production image as `ghcr.io/nestorniloy/dualtrack-enterprise` with `latest` and commit-SHA tags. Pull requests and other branch builds verify the image without publishing it.
 
 The JaCoCo report artifact is retained for 14 days.
 
@@ -805,45 +809,52 @@ Production credentials must be stored in the hosting provider's secret/environme
 
 ---
 
-## Deployment Roadmap
+## Deployment and Hosting
 
-The project currently has a working Docker-based local environment and a CI pipeline that verifies the application and builds its production image.
+DualTrack Enterprise is deployed and publicly accessible:
 
-The next infrastructure steps are:
+**Live application:** https://dualtrack-enterprise.onrender.com
 
-| Item | Status |
+The deployed application uses the same Spring Boot service for the static frontend and REST API, with a managed PostgreSQL database for persistent application data.
+
+### Current deployment status
+
+| Component | Status |
 |---|---|
-| Dockerized Spring Boot application | Implemented |
-| PostgreSQL Docker Compose environment | Implemented |
-| Automated Maven verification | Implemented |
-| PostgreSQL integration tests | Implemented |
-| JaCoCo coverage quality gate | Implemented |
-| CI Docker image build | Implemented |
-| Automatic publishing to GitHub Container Registry | Planned |
-| Automated deployment to Render | Planned |
-| Production PostgreSQL configuration | Planned |
-| Live production URL | Planned |
+| Spring Boot application on Render | Deployed |
+| Public application URL | Live |
+| Managed PostgreSQL database on Render | Connected |
+| Docker image published to GitHub Container Registry | Implemented |
+| GitHub Actions tests, coverage and image publishing | Implemented |
+| Automatic deployment from GitHub Actions to Render | Not configured; Render deployment is managed separately |
+| Migration of the production database to Neon Free | Planned |
 
-### Target deployment architecture
+The current Render free PostgreSQL database is time-limited. It should not be treated as permanent storage: after its free database period expires, the application will lose database connectivity until the database is upgraded or migrated. The planned migration to Neon is intended to keep the portfolio deployment on a $0 database plan, subject to Neon's free-tier quotas and terms.
+
+### Deployment architecture
 
 ```mermaid
 flowchart TD
     DEV["Developer"] --> GIT["GitHub Repository"]
     GIT --> CI["GitHub Actions"]
     CI --> TEST["Tests + Coverage"]
-    TEST --> IMAGE["Build Docker Image"]
+    TEST --> IMAGE["Build and Publish Docker Image"]
     IMAGE --> GHCR["GitHub Container Registry"]
     GHCR --> RENDER["Render Web Service"]
-    RENDER --> DB[("Managed PostgreSQL")]
+    RENDER --> DB[("Render PostgreSQL - current")]
     USER["Browser"] --> RENDER
+    DB -. "Planned database migration" .-> NEON[("Neon PostgreSQL Free")]
 ```
 
-The intended deployment model is a single Spring Boot web service backed by managed PostgreSQL.
+The production application is a single Spring Boot web service backed by PostgreSQL. The frontend and REST API remain on the same origin, preserving the existing session-based authentication and CSRF design.
 
-The frontend and REST API remain on the same origin, preserving the existing session-based authentication and CSRF design.
+Render's free web service may spin down after a period of inactivity, so the first request after an idle period can take longer while the service starts. This is separate from the database's expiration policy.
 
-This is a target architecture; registry publishing and Render deployment are not yet configured.
+### Database portability
 
+The application uses standard PostgreSQL connectivity through environment variables. The production database can be moved without changing the application architecture or rewriting the CRUD, authentication or dashboard features. The deployment configuration needs the destination PostgreSQL JDBC URL, username and password, and the existing Flyway migrations create and validate the schema on startup.
+
+Neon Free is the planned destination because it provides a $0/month PostgreSQL tier with usage limits rather than the current Render database's 30-day free period. Its quotas and terms can change; see [Neon's plans documentation](https://neon.com/docs/introduction/plans) for current limits.
 ---
 
 ## Engineering Decisions
@@ -906,7 +917,7 @@ The current implementation includes:
 - Coverage enforcement.
 - GitHub Actions CI and Docker build verification.
 
-The next development milestone is automated container publishing and deployment to Render.
+The next infrastructure milestone is migrating the production PostgreSQL database from Render to Neon Free. The live Render web service and existing application functionality will remain in place.
 
 ---
 
